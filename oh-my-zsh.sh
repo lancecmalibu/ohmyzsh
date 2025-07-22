@@ -1,5 +1,37 @@
 # ANSI formatting function (\033[<code>m)
 # 0: reset, 1: bold, 4: underline, 22: no bold, 24: no underline, 31: red, 33: yellow
+
+# Timing function - disabled unless OMZ_DEBUG_TIMING=1
+_omz_timer() {
+  [[ "$OMZ_DEBUG_TIMING" = "1" ]] || return
+  
+  local start_var="$1"
+  local end_var="$2"
+  local label="$3"
+  
+  if [[ -n "$end_var" ]]; then
+    # End timing - get current time
+    local end_time=$(($(gdate +%s%N)/1000000))
+    eval "$end_var=\$end_time"
+    local start_time=${(P)start_var}
+    local elapsed=$((end_time - start_time))
+    echo "${elapsed}ms: $label"
+  else
+    # Start timing
+    eval "$start_var=\$(($(gdate +%s%N)/1000000))"
+  fi
+}
+
+# Simple debug print function
+_omz_debug() {
+  [[ "$OMZ_DEBUG_TIMING" = "1" ]] || return
+  local current_time=$(($(gdate +%s%N)/1000000))
+  echo "${current_time}ms: $1"
+}
+
+# Start overall timing
+_omz_timer start_total
+
 omz_f() {
   [ $# -gt 0 ] || return
   IFS=";" printf "\033[%sm" $*
@@ -64,18 +96,23 @@ if [[ ! -w "$ZSH_CACHE_DIR" ]]; then
 fi
 
 # Create cache and completions dir and add to $fpath
+_omz_debug "Starting cache setup"
 mkdir -p "$ZSH_CACHE_DIR/completions"
 (( ${fpath[(Ie)$ZSH_CACHE_DIR/completions]} )) || fpath=("$ZSH_CACHE_DIR/completions" $fpath)
 
 # Check for updates on initial load...
+_omz_debug "Starting update check"
 source "$ZSH/tools/check_for_upgrade.sh"
+_omz_debug "Finished update check"
 
 # Initializes Oh My Zsh
+_omz_debug "Starting Oh My Zsh initialization"
 
 # add a function path
 fpath=($ZSH/{functions,completions} $ZSH_CUSTOM/{functions,completions} $fpath)
 
 # Load all stock functions (from $fpath files) called below.
+_omz_debug "Loading autoload functions"
 autoload -U compaudit compinit zrecompile
 
 is_plugin() {
@@ -87,6 +124,7 @@ is_plugin() {
 
 # Add all defined plugins to fpath. This must be done
 # before running compinit.
+_omz_timer fpath_start
 for plugin ($plugins); do
   if is_plugin "$ZSH_CUSTOM" "$plugin"; then
     fpath=("$ZSH_CUSTOM/plugins/$plugin" $fpath)
@@ -96,8 +134,10 @@ for plugin ($plugins); do
     echo "[oh-my-zsh] plugin '$plugin' not found"
   fi
 done
+_omz_timer fpath_start fpath_end "Adding plugins to fpath"
 
 # Figure out the SHORT hostname
+_omz_debug "Getting hostname"
 if [[ "$OSTYPE" = darwin* ]]; then
   # macOS's $HOST changes with dhcp, etc. Use LocalHostName if possible.
   SHORT_HOST=$(scutil --get LocalHostName 2>/dev/null) || SHORT_HOST="${HOST/.*/}"
@@ -111,6 +151,7 @@ if [[ -z "$ZSH_COMPDUMP" ]]; then
 fi
 
 # Construct zcompdump OMZ metadata
+_omz_debug "Setting up completion metadata"
 zcompdump_revision="#omz revision: $(builtin cd -q "$ZSH"; git rev-parse HEAD 2>/dev/null)"
 zcompdump_fpath="#omz fpath: $fpath"
 
@@ -121,16 +162,20 @@ if ! command grep -q -Fx "$zcompdump_revision" "$ZSH_COMPDUMP" 2>/dev/null \
   zcompdump_refresh=1
 fi
 
+_omz_timer compinit_start
 if [[ "$ZSH_DISABLE_COMPFIX" != true ]]; then
+  _omz_debug "Loading compfix and running secure compinit"
   source "$ZSH/lib/compfix.zsh"
   # Load only from secure directories
   compinit -i -d "$ZSH_COMPDUMP"
   # If completion insecurities exist, warn the user
   handle_completion_insecurities &|
 else
+  _omz_debug "Running unsafe compinit"
   # If the user wants it, load from all found directories
   compinit -u -d "$ZSH_COMPDUMP"
 fi
+_omz_timer compinit_start compinit_end "Completion initialization"
 
 # Append zcompdump metadata if missing
 if (( $zcompdump_refresh )) \
@@ -146,13 +191,17 @@ fi
 unset zcompdump_revision zcompdump_fpath zcompdump_refresh
 
 # zcompile the completion dump file if the .zwc is older or missing.
+_omz_timer zrecompile_start
 if command mkdir "${ZSH_COMPDUMP}.lock" 2>/dev/null; then
+  _omz_debug "Recompiling completion dump"
   zrecompile -q -p "$ZSH_COMPDUMP"
   command rm -rf "$ZSH_COMPDUMP.zwc.old" "${ZSH_COMPDUMP}.lock"
 fi
+_omz_timer zrecompile_start zrecompile_end "Completion recompilation"
 
 _omz_source() {
   local context filepath="$1"
+  [[ "$OMZ_DEBUG_TIMING" = "1" ]] && local timer_start=$(($(gdate +%s%N)/1000000))
 
   # Construct zstyle context based on path
   case "$filepath" in
@@ -190,25 +239,38 @@ _omz_source() {
       (( #galiases )) && unalias "${(@k)galiases}"
     fi
   fi
+
+  # Report timing only if debug enabled
+  if [[ "$OMZ_DEBUG_TIMING" = "1" ]]; then
+    local timer_end=$(($(gdate +%s%N)/1000000))
+    local elapsed=$((timer_end - timer_start))
+    echo "${elapsed}ms: _omz_source $filepath"
+  fi
 }
 
 # Load all of the lib files in ~/.oh-my-zsh/lib that end in .zsh
 # TIP: Add files you don't want in git to .gitignore
+_omz_timer lib_start
 for lib_file ("$ZSH"/lib/*.zsh); do
   _omz_source "lib/${lib_file:t}"
 done
+_omz_timer lib_start lib_end "Loading lib files"
 unset lib_file
 
 # Load all of the plugins that were defined in ~/.zshrc
+_omz_timer plugins_start
 for plugin ($plugins); do
   _omz_source "plugins/$plugin/$plugin.plugin.zsh"
 done
+_omz_timer plugins_start plugins_end "Loading plugins"
 unset plugin
 
 # Load all of your custom configurations from custom/
+_omz_timer custom_start
 for config_file ("$ZSH_CUSTOM"/*.zsh(N)); do
   source "$config_file"
 done
+_omz_timer custom_start custom_end "Loading custom configs"
 unset config_file
 
 # Load the theme
@@ -219,6 +281,7 @@ is_theme() {
 }
 
 if [[ -n "$ZSH_THEME" ]]; then
+  _omz_timer theme_start
   if is_theme "$ZSH_CUSTOM" "$ZSH_THEME"; then
     source "$ZSH_CUSTOM/$ZSH_THEME.zsh-theme"
   elif is_theme "$ZSH_CUSTOM/themes" "$ZSH_THEME"; then
@@ -228,7 +291,13 @@ if [[ -n "$ZSH_THEME" ]]; then
   else
     echo "[oh-my-zsh] theme '$ZSH_THEME' not found"
   fi
+  _omz_timer theme_start theme_end "Loading theme: $ZSH_THEME"
 fi
 
 # set completion colors to be the same as `ls`, after theme has been loaded
+_omz_debug "Setting completion colors"
 [[ -z "$LS_COLORS" ]] || zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+
+# Final timing report
+_omz_timer start_total total_end "TOTAL OH-MY-ZSH LOADING"
+_omz_debug "Oh My Zsh loading complete"

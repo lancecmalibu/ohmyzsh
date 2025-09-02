@@ -1,0 +1,213 @@
+iterm_features = ["current_dir","remote_host"]
+"$schema" = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json"
+console_title_template = "{{ .Shell }} in {{ .Folder }}"
+final_space = true
+version = 3
+
+[palette]
+  primary = "#8d19b3"
+
+
+  # Analogous Colors
+  secondary = "#3f19b3"
+  mutedSecondary = "#804fd1"
+  tertiary = "#b3198c"
+  mutedTertiary = "#dd91c4"
+
+  # Complementary Colors
+  complementary = "#3fb319"
+  mutedComplementary = "#a4d895"
+
+  # Triadic Colors
+  triadicSecondary = "#b3193f"
+  mutedtriadicSecondary = "#df3e5c"
+  triadicTertiary = "#b38d19"
+
+  # Utility colors.
+  dark = "#000000"
+  light = "#d3d7cf"
+
+
+[transient_prompt]
+
+  background = "p:mutedSecondary"
+  background_templates = [
+    "{{ if gt .Code 0 }}p:triadicSecondary{{ end }}"
+  ]
+
+  foreground = "transparent"
+  template = "<p:mutedSecondary,transparent></><p:light> {{ .UserName }}</> <transparent,background>{{ if gt .Code 0 }}  {{else}}</><p:mutedtriadicSecondary></><p:mutedtriadicSecondary,transparent> </>{{ end }}"
+
+[[blocks]] # Left aligned blocks above the prompt. 
+  alignment = "left"
+  type = "prompt"
+
+  [[blocks.segments]] # Line above the prompt, shows OS.
+    background = "p:light"
+    foreground = "p:dark"
+    leading_diamond = "" # Trailing_diamond = "\ue0b0" # Uncomment to add space between segments
+    style = "diamond"
+    template = " {{ if .WSL }}WSL at {{ end }}{{.Icon}} "
+    type = "os"
+      
+  [[blocks.segments]] # FilePath. Shows relative to the git root if available.
+    background = "p:primary"
+    foreground = "p:dark"
+    powerline_symbol = ""
+    style = "powerline"
+    templates = [
+      "{{ $githubURL := (.Segments.Git.UpstreamURL | splitList \"/\" | last | splitList \".\" | first )}} {{ $githubURL }} "
+    ]
+    type = "path"
+
+    [blocks.segments.properties]
+      "folder_separator_icon" = "/"
+      home_icon = " 󰋜 "
+      style = "full"
+      [blocks.segments.properties.mapped_locations]
+        "/Users/lancec/Repositories/*" = " "
+
+  [[blocks.segments]] # Git info
+    background = "#4e9a06"
+    background_templates = [
+      "{{ if or (.Working.Changed) (.Staging.Changed) }}#c4a000{{ end }}",
+      "{{ if and (gt .Ahead 0) (gt .Behind 0) }}#f26d50{{ end }}",
+      "{{ if gt .Ahead 0 }}#89d1dc{{ end }}",
+      "{{ if gt .Behind 0 }}#4e9a06{{ end }}"
+    ]
+    foreground = "p:dark"
+    powerline_symbol = ""
+    style = "powerline"
+    template = " {{ .UpstreamIcon }}{{ .HEAD }}{{if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if .Working.Changed }} \uf044 {{ .Working.String }}{{ end }}{{ if and (.Working.Changed) (.Staging.Changed) }} |{{ end }}{{ if .Staging.Changed }} \uf046 {{ .Staging.String }}{{ end }}{{ if gt .StashCount 0 }} \ueb4b {{ .StashCount }}{{ end }} "
+    type = "git"
+
+    [blocks.segments.properties]
+      branch_icon = " \uf126 "
+      fetch_stash_count = true
+      fetch_status = true
+      fetch_upstream_icon = true
+
+[[blocks]] # Right Aligned blocks above the prompt. Merges with and is displayed after the left aligned blocks in the same line.
+  alignment = "right"
+  type = "prompt"
+
+  [[blocks.segments]] # AWS Profile information
+    background_templates = [
+      "{{if contains 'STG' .Profile}}#FFA400{{end}}", 
+      "{{if contains 'jan' .Profile}}#f1184c{{end}}" 
+    ]
+    foreground = "p:light"
+    powerline_symbol = "\ue0b2"
+    leading_diamond = ""
+
+    style = "accordion"
+    template = "{{ .Profile }}{{ if (ne .Region 'us-east-1') }}@{{ .Region }}{{ end }}{{.Env.World := 'Earth'}} \ue7ad "
+    type = "aws"
+
+    [blocks.segments.properties]
+      display_default = false
+
+  [[blocks.segments]]
+    foreground = "p:light"
+    style = "plain"
+    template = "\u2500\u256e"    
+    type = "text"
+
+
+  [[blocks.segments]]
+    background = "#689f63"
+    foreground = "p:light"
+    invert_powerline = true
+    powerline_symbol = "\ue0b2"
+    style = "powerline"
+    template = " {{ if .PackageManagerIcon }}{{ .PackageManagerIcon }} {{ end }}{{ .Full }} \ue718 "
+    type = "node"
+
+    [blocks.segments.properties]
+      fetch_version = true
+
+  [[blocks.segments]]
+    background = "#00acd7"
+    foreground = "p:dark"
+    invert_powerline = true
+    powerline_symbol = "\ue0b2"
+    style = "powerline"
+    template = " {{ if .Error }}{{ .Error }}{{ else }}{{ .Full }}{{ end }} \ue627 "
+    type = "go"
+
+    [blocks.segments.properties]
+      fetch_version = true
+
+  [[blocks.segments]]
+    background = "#FFDE57"
+    foreground = "p:dark"
+    invert_powerline = true
+    powerline_symbol = "\ue0b2"
+    style = "powerline"
+    template = " {{ if .Error }}{{ .Error }}{{ else }}{{ .Full }}{{ end }} \ue235 "
+    type = "python"
+
+    [blocks.segments.properties]
+      display_mode = "files"
+      fetch_virtual_env = false
+
+[[blocks]]
+alignment = "left"
+newline = true
+type = "prompt"
+
+  [[blocks.segments]]
+    foreground = "p:mutedtriadicSecondary"
+    background = "p:secondary"
+    leading_diamond = ""
+    trailing_diamond = "<p:mutedComplementary,transparent>󰭄󰭄</><p:tertiary,p:mutedComplementary> </>"#<r> </r> <p:mutedComplementary,transparent></>╼
+    style = "diamond"
+    template = "<p:mutedtriadicSecondary,transparent> </><p:secondary,p:mutedtriadicSecondary></><transparent,></> <p:light>{{ .UserName }}</> "
+    type = "text"
+
+[[blocks]]
+  alignment = "right"
+  type = "rprompt"
+
+  [[blocks.segments]]
+    background = "#ffff66"
+    foreground = "p:dark"
+    invert_powerline = true
+    powerline_symbol = "\ue0b2"
+    style = "powerline"
+    template = " \uf0ad "
+    type = "root"
+
+  [[blocks.segments]]
+    background = "#c4a000"
+
+    foreground = "p:dark"
+    invert_powerline = true
+    powerline_symbol = "\ue0b2"
+    style = "powerline"
+    template = " {{ .FormattedMs }} \uf252 "
+    type = "executiontime"
+
+  [[blocks.segments]]
+    background = "p:dark"
+    background_templates = ["{{ if gt .Code 0 }}#cc2222{{ end }}"]
+    foreground = "p:light"
+    invert_powerline = true
+    powerline_symbol = "\ue0b2"
+    style = "powerline"
+    template = " {{ if gt .Code 0 }}{{ reason .Code }}{{ else }}\uf42e{{ end }} "
+    type = "status"
+
+    [blocks.segments.properties]
+      always_enabled = true
+
+  [[blocks.segments]]
+    background = "p:light"
+    foreground = "p:dark"
+    invert_powerline = true
+    style = "diamond"
+    template = " {{ .CurrentDate | date .Format }}{{.Env.World}}   "
+    trailing_diamond = "\ue0b0\u2500\u256f"
+    type = "time"
+      [blocks.segments.properties]
+        time_format = "3:04 PM"
